@@ -1,12 +1,17 @@
-import { Component, PropTypes } from 'react'
-import { isString, isPlainObject, isEqual, map, pickBy, reduce, set } from 'lodash'
+import { createElement, Component, PropTypes } from 'react'
+import { isString, isPlainObject, isEqual, map, pickBy, reduce } from 'lodash'
 import { connect } from 'react-redux'
 import invariant from 'invariant'
-import { firebaseAppShape } from './PropTypes'
 import { getDisplayName, getSubscriptionKey } from './utils'
 import * as firebaseActions from './actions'
 
+const storeShape = PropTypes.shape({
+  dispatch: PropTypes.func.isRequired,
+})
+
 const defaultMapPropsToSubscriptions = props => ({}) // eslint-disable-line no-unused-vars
+const defaultMapStateToProps = state => ({}) // eslint-disable-line no-unused-vars
+const defaultGetFirebaseState = ({ firebase }) => firebase
 
 export default (
   mapPropsToSubscriptions,
@@ -16,7 +21,8 @@ export default (
   options = {}
 ) => {
   const mapSubscriptions = mapPropsToSubscriptions || defaultMapPropsToSubscriptions
-  const { pure = true } = options
+  const mapState = mapStateToProps || defaultMapStateToProps
+  const { pure = true, getFirebaseState = defaultGetFirebaseState } = options
 
   const mapSubscriptionsToQueries = props => {
     const subscriptions = mapSubscriptions(props)
@@ -27,41 +33,36 @@ export default (
       subscriptions
     )
 
-    return map(subscriptions, query => (isString(query) ? { path: query } : query))
+    return reduce(subscriptions, (queries, subscription, key) => ({
+      ...queries,
+      [key]: isString(subscription) ? { path: subscription } : subscription,
+    }), {})
   }
 
-  const mapSubscriptionsToProps = ({ subscriptions }, ownProps) => {
-    const queries = mapSubscriptions(mapSubscriptionsToQueries(ownProps))
+  const mapSubscriptionsToProps = (state, ownProps) => {
+    const subscriptions = getFirebaseState(state)
+    const queries = mapSubscriptionsToQueries(ownProps)
 
     return reduce(queries, (props, { path, ...query }, prop) => {
       const key = getSubscriptionKey(path, query)
       const value = subscriptions[key]
 
-      return set(props, prop, value)
+      return {
+        ...props,
+        [prop]: value,
+      }
     }, {})
   }
 
-  const mapState = (state, ownProps) => {
+  const mapStateToMergedProps = (state, ownProps) => {
     const subscriptionProps = mapSubscriptionsToProps(state, ownProps)
-    const stateProps = mapStateToProps(state, ownProps)
+    const stateProps = mapState(state, ownProps)
 
     return {
       ...subscriptionProps,
       ...stateProps,
     }
   }
-
-  const subscribe = subscriptions => (
-    map(mapSubscriptionsToQueries(subscriptions), ({ path, ...query }) => (
-      firebaseActions.subscribe(path, query)
-    ))
-  )
-
-  const unsubscribe = subscriptions => (
-    map(mapSubscriptionsToQueries(subscriptions), ({ path, ...query }) => (
-      firebaseActions.unsubscribe(path, query)
-    ))
-  )
 
   return WrappedComponent => {
     class FirebaseConnect extends Component {
@@ -71,15 +72,21 @@ export default (
       static defaultProps = Component.defaultProps
 
       static contextTypes = {
-        firebase: firebaseAppShape,
+        store: storeShape,
       }
 
       static propTypes = {
-        children: PropTypes.node,
+        store: storeShape,
+      }
+
+      constructor(props, context) {
+        super(props)
+
+        this.store = props.store || context.store
       }
 
       componentDidMount() {
-        subscribe(mapSubscriptions(this.props))
+        this.subscribe(mapSubscriptions(this.props))
       }
 
       componentWillReceiveProps(nextProps) {
@@ -93,20 +100,40 @@ export default (
             subscriptions[key] && !isEqual(subscriptions[key], value)
           ))
 
-          unsubscribe({ ...removed, ...changed })
-          subscribe({ ...added, ...changed })
+          this.unsubscribe({ ...removed, ...changed })
+          this.subscribe({ ...added, ...changed })
         }
       }
 
       componentWillUnmount() {
-        unsubscribe(mapSubscriptions(this.props))
+        this.unsubscribe(mapSubscriptions(this.props))
+      }
+
+      subscribe(subscriptions) {
+        const { dispatch } = this.store
+        const queries = mapSubscriptionsToQueries(subscriptions)
+
+        map(queries, ({ path, ...query }) => (
+          dispatch(firebaseActions.subscribe(path, query))
+        ))
+      }
+
+      unsubscribe(subscriptions) {
+        const { dispatch } = this.store
+        const queries = mapSubscriptionsToQueries(subscriptions)
+
+        map(queries, ({ path, ...query }) => (
+          dispatch(firebaseActions.unsubscribe(path, query))
+        ))
       }
 
       render() {
-        return this.props.children
+        return createElement(WrappedComponent, this.props)
       }
     }
 
-    return connect(mapState, mapDispatchToProps, mergeProps, options)(FirebaseConnect)
+    const withConnect = connect(mapStateToMergedProps, mapDispatchToProps, mergeProps, options)
+
+    return withConnect(FirebaseConnect)
   }
 }

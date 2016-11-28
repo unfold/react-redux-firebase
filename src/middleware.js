@@ -18,7 +18,8 @@ const createAsyncActionTypes = type => ({
   failureType: `${type}_FAILURE`,
 })
 
-export default ({ database }) => ({ dispatch }) => {
+export default firebase => ({ dispatch }) => {
+  const database = firebase.database()
   const subscriptions = new Map()
 
   const createCallback = (type, props) => {
@@ -29,7 +30,7 @@ export default ({ database }) => ({ dispatch }) => {
     )
   }
 
-  const getQueryRef = ({ path, ...query }) => (
+  const getQueryRef = (path, query) => (
     reduce(query, (ref, args, method) => ref[method](...args), database.ref(path))
   )
 
