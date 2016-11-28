@@ -24,9 +24,7 @@ export default (
   const mapState = mapStateToProps || defaultMapStateToProps
   const { pure = true, getFirebaseState = defaultGetFirebaseState } = options
 
-  const mapSubscriptionsToQueries = props => {
-    const subscriptions = mapSubscriptions(props)
-
+  const mapSubscriptionsToQueries = subscriptions => {
     invariant(
       isPlainObject(subscriptions),
       '`mapPropsToSubscriptions` must return an object. Instead received %s.',
@@ -40,12 +38,13 @@ export default (
   }
 
   const mapSubscriptionsToProps = (state, ownProps) => {
-    const subscriptions = getFirebaseState(state)
-    const queries = mapSubscriptionsToQueries(ownProps)
+    const subscriptions = mapSubscriptions(ownProps)
+    const queries = mapSubscriptionsToQueries(subscriptions)
+    const values = getFirebaseState(state)
 
     return reduce(queries, (props, { path, ...query }, prop) => {
       const key = getSubscriptionKey(path, query)
-      const value = subscriptions[key]
+      const value = values[key]
 
       return {
         ...props,

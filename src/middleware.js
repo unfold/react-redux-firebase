@@ -1,4 +1,4 @@
-import { reduce } from 'lodash'
+import { isArray, reduce } from 'lodash'
 
 import {
   PUSH,
@@ -31,7 +31,11 @@ export default firebase => ({ dispatch }) => {
   }
 
   const getQueryRef = (path, query) => (
-    reduce(query, (ref, args, method) => ref[method](...args), database.ref(path))
+    reduce(query, (ref, args, method) => {
+      const argsArray = isArray(args) ? args : [args]
+
+      return ref[method](...argsArray)
+    }, database.ref(path))
   )
 
   const subscribe = (path, query) => {
