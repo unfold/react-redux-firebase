@@ -43,7 +43,7 @@ ReactDOM.render(
 )
 ```
 
-### `connect([mapPropsToSubscriptions], [mapFirebaseToProps], [mergeProps], [options])`
+### `connect([mapPropsToSubscriptions], [mapFirebaseToProps], [mergeProps])`
 
 Connects a React component to a Firebase App reference.
 
@@ -59,7 +59,7 @@ Instead, it *returns* a new, connected component class, for you to use.
 * [`mergeProps(stateProps, actionProps, ownProps): props`] \(*Function*): If specified, it is passed the result of `mapPropsToSubscriptions()`, `mapFirebaseToProps()`, and the parent `props`. The plain object you return from it will be passed as props to the wrapped component. You may specify this function to select a slice of the state based on props, or to bind action creators to a particular variable from props. If you omit it, `Object.assign({}, ownProps, stateProps, actionProps)` is used by default.
 
 * [`options`] *(Object)* If specified, further customizes the behavior of the connector.
-  * [`pure = true`] *(Boolean)*: If true, implements `shouldComponentUpdate` and shallowly compares the result of `mergeProps`, preventing unnecessary updates, assuming that the component is a “pure” component and does not rely on any input or state other than its props and subscriptions. *Defaults to `true`.*
+  * [`getFirebaseState(state)`] *(Object)*: If specified, it should return the `react-firebase` portion of your state *Defaults to `state => state.firebase`.*
 
 #### Returns
 

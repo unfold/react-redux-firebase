@@ -22,7 +22,7 @@ export default (
 ) => {
   const mapSubscriptions = mapPropsToSubscriptions || defaultMapPropsToSubscriptions
   const mapState = mapStateToProps || defaultMapStateToProps
-  const { pure = true, getFirebaseState = defaultGetFirebaseState } = options
+  const { getFirebaseState = defaultGetFirebaseState } = options
 
   const mapSubscriptionsToQueries = subscriptions => {
     invariant(
@@ -91,17 +91,14 @@ export default (
       componentWillReceiveProps(nextProps) {
         const subscriptions = mapSubscriptions(this.props)
         const nextSubscriptions = mapSubscriptions(nextProps)
+        const added = pickBy(nextSubscriptions, (value, key) => !subscriptions[key])
+        const removed = pickBy(subscriptions, (value, key) => !nextSubscriptions[key])
+        const changed = pickBy(nextSubscriptions, (value, key) => (
+          subscriptions[key] && !isEqual(subscriptions[key], value)
+        ))
 
-        if (!pure || !isEqual(subscriptions, nextSubscriptions)) {
-          const added = pickBy(nextSubscriptions, (value, key) => !subscriptions[key])
-          const removed = pickBy(subscriptions, (value, key) => !nextSubscriptions[key])
-          const changed = pickBy(nextSubscriptions, (value, key) => (
-            subscriptions[key] && !isEqual(subscriptions[key], value)
-          ))
-
-          this.unsubscribe({ ...removed, ...changed })
-          this.subscribe({ ...added, ...changed })
-        }
+        this.unsubscribe({ ...removed, ...changed })
+        this.subscribe({ ...added, ...changed })
       }
 
       componentWillUnmount() {
